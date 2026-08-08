@@ -1960,11 +1960,11 @@ function SortingVisualizer() {
                 ">
 
                     <div className="
-                        grid
-                        grid-cols-1
-                        md:grid-cols-3
-                        gap-4
-                    ">
+    grid
+    grid-cols-3
+    gap-2
+    md:gap-4
+">
 
                         {/* COMPARACIONES */}
 
@@ -1973,7 +1973,7 @@ function SortingVisualizer() {
                             border
                             border-slate-800
                             rounded-2xl
-                            p-5
+                            p-3 md:p-5
                         ">
 
                             <div className="
@@ -1992,7 +1992,7 @@ function SortingVisualizer() {
                                     </p>
 
                                     <p className="
-                                        text-3xl
+                                        text-xl md:text-3xl
                                         font-bold
                                         mt-1
                                     ">
@@ -2030,7 +2030,7 @@ function SortingVisualizer() {
                             border
                             border-slate-800
                             rounded-2xl
-                            p-5
+                            p-3 md:p-5
                         ">
 
                             <div className="
@@ -2049,7 +2049,7 @@ function SortingVisualizer() {
                                     </p>
 
                                     <p className="
-                                        text-3xl
+                                        text-xl md:text-3xl
                                         font-bold
                                         mt-1
                                     ">
@@ -2087,7 +2087,7 @@ function SortingVisualizer() {
                             border
                             border-slate-800
                             rounded-2xl
-                            p-5
+                            p-3 md:p-5
                         ">
 
                             <div className="
@@ -2106,7 +2106,7 @@ function SortingVisualizer() {
                                     </p>
 
                                     <p className="
-                                        text-3xl
+                                        text-xl md:text-3xl
                                         font-bold
                                         mt-1
                                     ">
@@ -2471,7 +2471,7 @@ function SortingVisualizer() {
             ">
 
                 <div className="
-                    p-5
+                    p-3 md:p-5
                     rounded-2xl
                     bg-slate-900
                     border
@@ -2507,7 +2507,7 @@ function SortingVisualizer() {
                 </div>
 
                 <div className="
-                    p-5
+                    p-3 md:p-5
                     rounded-2xl
                     bg-slate-900
                     border
@@ -2543,7 +2543,7 @@ function SortingVisualizer() {
                 </div>
 
                 <div className="
-                    p-5
+                    p-3 md:p-5
                     rounded-2xl
                     bg-slate-900
                     border
