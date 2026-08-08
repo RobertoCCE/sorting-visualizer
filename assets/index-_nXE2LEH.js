@@ -284,16 +284,16 @@ Error generating stack: `+e.message+`
                     px-6\r
                     pb-6\r
                 `,children:(0,k.jsxs)(`div`,{className:`\r
-                        grid\r
-                        grid-cols-1\r
-                        md:grid-cols-3\r
-                        gap-4\r
-                    `,children:[(0,k.jsx)(`div`,{className:`\r
+    grid\r
+    grid-cols-3\r
+    gap-2\r
+    md:gap-4\r
+`,children:[(0,k.jsx)(`div`,{className:`\r
                             bg-slate-950\r
                             border\r
                             border-slate-800\r
                             rounded-2xl\r
-                            p-5\r
+                            p-3 md:p-5\r
                         `,children:(0,k.jsxs)(`div`,{className:`\r
                                 flex\r
                                 items-center\r
@@ -302,7 +302,7 @@ Error generating stack: `+e.message+`
                                         text-sm\r
                                         text-slate-500\r
                                     `,children:`Comparaciones`}),(0,k.jsx)(`p`,{className:`\r
-                                        text-3xl\r
+                                        text-xl md:text-3xl\r
                                         font-bold\r
                                         mt-1\r
                                     `,children:n})]}),(0,k.jsx)(`div`,{className:`\r
@@ -319,7 +319,7 @@ Error generating stack: `+e.message+`
                             border\r
                             border-slate-800\r
                             rounded-2xl\r
-                            p-5\r
+                            p-3 md:p-5\r
                         `,children:(0,k.jsxs)(`div`,{className:`\r
                                 flex\r
                                 items-center\r
@@ -328,7 +328,7 @@ Error generating stack: `+e.message+`
                                         text-sm\r
                                         text-slate-500\r
                                     `,children:`Movimientos`}),(0,k.jsx)(`p`,{className:`\r
-                                        text-3xl\r
+                                        text-xl md:text-3xl\r
                                         font-bold\r
                                         mt-1\r
                                     `,children:i})]}),(0,k.jsx)(`div`,{className:`\r
@@ -345,7 +345,7 @@ Error generating stack: `+e.message+`
                             border\r
                             border-slate-800\r
                             rounded-2xl\r
-                            p-5\r
+                            p-3 md:p-5\r
                         `,children:(0,k.jsxs)(`div`,{className:`\r
                                 flex\r
                                 items-center\r
@@ -354,7 +354,7 @@ Error generating stack: `+e.message+`
                                         text-sm\r
                                         text-slate-500\r
                                     `,children:`Elementos`}),(0,k.jsx)(`p`,{className:`\r
-                                        text-3xl\r
+                                        text-xl md:text-3xl\r
                                         font-bold\r
                                         mt-1\r
                                     `,children:e.length})]}),(0,k.jsx)(`div`,{className:`\r
@@ -491,7 +491,7 @@ Error generating stack: `+e.message+`
                 md:grid-cols-3\r
                 gap-4\r
             `,children:[(0,k.jsxs)(`div`,{className:`\r
-                    p-5\r
+                    p-3 md:p-5\r
                     rounded-2xl\r
                     bg-slate-900\r
                     border\r
@@ -511,7 +511,7 @@ Error generating stack: `+e.message+`
                         text-slate-500\r
                         mt-1\r
                     `,children:c})]}),(0,k.jsxs)(`div`,{className:`\r
-                    p-5\r
+                    p-3 md:p-5\r
                     rounded-2xl\r
                     bg-slate-900\r
                     border\r
@@ -531,7 +531,7 @@ Error generating stack: `+e.message+`
                         text-slate-500\r
                         mt-1\r
                     `,children:`Complejidad máxima`})]}),(0,k.jsxs)(`div`,{className:`\r
-                    p-5\r
+                    p-3 md:p-5\r
                     rounded-2xl\r
                     bg-slate-900\r
                     border\r
