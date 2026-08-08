@@ -18,6 +18,9 @@ import {
     Check,
     Circle,
     Turtle,
+    Volume2,
+    VolumeX,
+    Clock,
 } from "lucide-react";
 
 const WIDTH = 950;
@@ -41,23 +44,192 @@ function SortingVisualizer() {
     const [isSorted, setIsSorted] = useState(false);
     const [activeIndices, setActiveIndices] = useState([]);
 
+    const [soundEnabled, setSoundEnabled] = useState(true);
+
+    // =========================
+    // TIEMPO
+    // =========================
+
+    const [elapsedTime, setElapsedTime] = useState(0);
+
+    const timerIntervalRef = useRef(null);
+    const timerStartRef = useRef(null);
+    const accumulatedTimeRef = useRef(0);
+
     // =========================
     // REFS
     // =========================
 
     const pausedRef = useRef(false);
     const stoppedRef = useRef(false);
+
     const audioContextRef = useRef(null);
 
-    // Identifica cada ejecución.
+    const soundEnabledRef = useRef(true);
+
     const sortRunRef = useRef(0);
+
+    // =========================
+    // FORMATEAR TIEMPO
+    // =========================
+
+    const formatTime = (time) => {
+
+        if (time < 1000) {
+            return `${time.toFixed(0)} ms`;
+        }
+
+        const seconds = time / 1000;
+
+        if (seconds < 60) {
+            return `${seconds.toFixed(2)} s`;
+        }
+
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+
+        return `${minutes}m ${remainingSeconds.toFixed(2)}s`;
+    };
+
+    // =========================
+    // INICIAR CRONÓMETRO
+    // =========================
+
+    const startTimer = () => {
+
+        timerStartRef.current = performance.now();
+
+        if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current);
+        }
+
+        timerIntervalRef.current = setInterval(() => {
+
+            if (
+                timerStartRef.current !== null &&
+                !pausedRef.current
+            ) {
+
+                const now = performance.now();
+
+                const currentElapsed =
+                    accumulatedTimeRef.current +
+                    (now - timerStartRef.current);
+
+                setElapsedTime(currentElapsed);
+            }
+
+        }, 10);
+    };
+
+    // =========================
+    // PAUSAR CRONÓMETRO
+    // =========================
+
+    const pauseTimer = () => {
+
+        if (timerStartRef.current !== null) {
+
+            const now = performance.now();
+
+            accumulatedTimeRef.current +=
+                now - timerStartRef.current;
+
+            timerStartRef.current = null;
+
+            setElapsedTime(
+                accumulatedTimeRef.current
+            );
+        }
+    };
+
+    // =========================
+    // CONTINUAR CRONÓMETRO
+    // =========================
+
+    const resumeTimer = () => {
+
+        timerStartRef.current =
+            performance.now();
+    };
+
+    // =========================
+    // DETENER CRONÓMETRO
+    // =========================
+
+    const stopTimer = () => {
+
+        if (timerStartRef.current !== null) {
+
+            const now = performance.now();
+
+            accumulatedTimeRef.current +=
+                now - timerStartRef.current;
+
+            timerStartRef.current = null;
+        }
+
+        setElapsedTime(
+            accumulatedTimeRef.current
+        );
+
+        if (timerIntervalRef.current) {
+
+            clearInterval(
+                timerIntervalRef.current
+            );
+
+            timerIntervalRef.current = null;
+        }
+    };
+
+    // =========================
+    // REINICIAR CRONÓMETRO
+    // =========================
+
+    const resetTimer = () => {
+
+        if (timerIntervalRef.current) {
+
+            clearInterval(
+                timerIntervalRef.current
+            );
+
+            timerIntervalRef.current = null;
+        }
+
+        timerStartRef.current = null;
+        accumulatedTimeRef.current = 0;
+
+        setElapsedTime(0);
+    };
+
+    // =========================
+    // LIMPIAR TIMER
+    // =========================
+
+    useEffect(() => {
+
+        return () => {
+
+            if (timerIntervalRef.current) {
+
+                clearInterval(
+                    timerIntervalRef.current
+                );
+            }
+        };
+
+    }, []);
 
     // =========================
     // GENERAR DATOS
     // =========================
 
     useEffect(() => {
+
         generateData();
+
     }, []);
 
     const generateData = () => {
@@ -77,10 +249,11 @@ function SortingVisualizer() {
         setIsPaused(false);
         setActiveIndices([]);
 
+        resetTimer();
+
         pausedRef.current = false;
         stoppedRef.current = false;
 
-        // Invalidar cualquier ejecución anterior
         sortRunRef.current += 1;
     };
 
@@ -88,7 +261,9 @@ function SortingVisualizer() {
     // GENERAR DATOS NUEVOS
     // =========================
 
-    const generateNewData = (amount = barCount) => {
+    const generateNewData = (
+        amount = barCount
+    ) => {
 
         const arr = Array.from(
             { length: amount },
@@ -105,6 +280,8 @@ function SortingVisualizer() {
         setIsPaused(false);
         setActiveIndices([]);
 
+        resetTimer();
+
         pausedRef.current = false;
         stoppedRef.current = false;
 
@@ -117,7 +294,8 @@ function SortingVisualizer() {
 
     const handleBarCountChange = (e) => {
 
-        const amount = Number(e.target.value);
+        const amount =
+            Number(e.target.value);
 
         setBarCount(amount);
 
@@ -132,51 +310,92 @@ function SortingVisualizer() {
 
     const handleAlgorithmChange = (e) => {
 
-        const newAlgorithm = e.target.value;
+        const newAlgorithm =
+            e.target.value;
 
         setAlgorithm(newAlgorithm);
 
-        /*
-         * Si el algoritmo anterior ya terminó,
-         * los datos están ordenados.
-         *
-         * Al cambiar de algoritmo generamos
-         * automáticamente nuevos datos para
-         * que el nuevo algoritmo pueda visualizarse.
-         */
         if (isSorted) {
+
             generateNewData(barCount);
+
         } else {
+
             setIsSorted(false);
             setComparisons(0);
             setSwaps(0);
             setActiveIndices([]);
+
+            resetTimer();
         }
     };
 
     // =========================
-    // AUDIO
+    // SONIDO
     // =========================
 
-    const playMoveSound = (value = 200) => {
+    const toggleSound = () => {
+
+        setSoundEnabled((previous) => {
+
+            const newValue = !previous;
+
+            soundEnabledRef.current =
+                newValue;
+
+            return newValue;
+        });
+    };
+
+    // =========================
+    // AUDIO CONTEXT
+    // =========================
+
+    const getAudioContext = () => {
+
+        if (!audioContextRef.current) {
+
+            const AudioContext =
+                window.AudioContext ||
+                window.webkitAudioContext;
+
+            if (!AudioContext) {
+                return null;
+            }
+
+            audioContextRef.current =
+                new AudioContext();
+        }
+
+        return audioContextRef.current;
+    };
+
+    // =========================
+    // SONIDO
+    // =========================
+
+    const playMoveSound = (
+        value = 200
+    ) => {
+
+        if (!soundEnabledRef.current) {
+            return;
+        }
 
         try {
 
-            if (!audioContextRef.current) {
+            const audioContext =
+                getAudioContext();
 
-                audioContextRef.current =
-                    new (
-                        window.AudioContext ||
-                        window.webkitAudioContext
-                    )();
+            if (!audioContext) {
+                return;
             }
 
-            const audioContext =
-                audioContextRef.current;
-
             if (
-                audioContext.state === "suspended"
+                audioContext.state ===
+                "suspended"
             ) {
+
                 audioContext.resume();
             }
 
@@ -189,13 +408,15 @@ function SortingVisualizer() {
             const frequency =
                 150 + value * 2;
 
-            oscillator.frequency.value =
-                Math.min(frequency, 900);
+            oscillator.frequency.setValueAtTime(
+                Math.min(frequency, 900),
+                audioContext.currentTime
+            );
 
             oscillator.type = "sine";
 
             gain.gain.setValueAtTime(
-                0.2,
+                0.12,
                 audioContext.currentTime
             );
 
@@ -205,9 +426,13 @@ function SortingVisualizer() {
             );
 
             oscillator.connect(gain);
-            gain.connect(audioContext.destination);
+            gain.connect(
+                audioContext.destination
+            );
 
-            oscillator.start();
+            oscillator.start(
+                audioContext.currentTime
+            );
 
             oscillator.stop(
                 audioContext.currentTime + 0.07
@@ -237,7 +462,8 @@ function SortingVisualizer() {
 
             if (
                 stoppedRef.current ||
-                currentRun !== sortRunRef.current
+                currentRun !==
+                    sortRunRef.current
             ) {
                 return false;
             }
@@ -246,7 +472,8 @@ function SortingVisualizer() {
 
                 if (
                     stoppedRef.current ||
-                    currentRun !== sortRunRef.current
+                    currentRun !==
+                        sortRunRef.current
                 ) {
                     return false;
                 }
@@ -279,7 +506,8 @@ function SortingVisualizer() {
 
         return (
             !stoppedRef.current &&
-            currentRun === sortRunRef.current
+            currentRun ===
+                sortRunRef.current
         );
     };
 
@@ -295,7 +523,8 @@ function SortingVisualizer() {
 
             if (
                 stoppedRef.current ||
-                currentRun !== sortRunRef.current
+                currentRun !==
+                    sortRunRef.current
             ) {
                 return false;
             }
@@ -311,7 +540,8 @@ function SortingVisualizer() {
 
         if (
             stoppedRef.current ||
-            currentRun !== sortRunRef.current
+            currentRun !==
+                sortRunRef.current
         ) {
             return false;
         }
@@ -329,6 +559,7 @@ function SortingVisualizer() {
     ) => {
 
         setActiveIndices(indices);
+
         playMoveSound(value);
     };
 
@@ -343,6 +574,9 @@ function SortingVisualizer() {
         }
 
         pausedRef.current = true;
+
+        pauseTimer();
+
         setIsPaused(true);
     };
 
@@ -357,6 +591,9 @@ function SortingVisualizer() {
         }
 
         pausedRef.current = false;
+
+        resumeTimer();
+
         setIsPaused(false);
     };
 
@@ -366,11 +603,13 @@ function SortingVisualizer() {
 
     const stopAndRestart = () => {
 
-        // Invalidar inmediatamente la ejecución actual
         sortRunRef.current += 1;
 
         stoppedRef.current = true;
         pausedRef.current = false;
+
+        stopTimer();
+        resetTimer();
 
         setIsSorting(false);
         setIsPaused(false);
@@ -380,7 +619,6 @@ function SortingVisualizer() {
         setComparisons(0);
         setSwaps(0);
 
-        // Crear datos completamente nuevos
         const arr = Array.from(
             { length: barCount },
             () =>
@@ -407,7 +645,8 @@ function SortingVisualizer() {
 
         if (
             stoppedRef.current ||
-            currentRun !== sortRunRef.current
+            currentRun !==
+                sortRunRef.current
         ) {
             return;
         }
@@ -433,7 +672,8 @@ function SortingVisualizer() {
 
             if (
                 stoppedRef.current ||
-                currentRun !== sortRunRef.current
+                currentRun !==
+                    sortRunRef.current
             ) {
                 return;
             }
@@ -447,7 +687,8 @@ function SortingVisualizer() {
 
             if (
                 stoppedRef.current ||
-                currentRun !== sortRunRef.current
+                currentRun !==
+                    sortRunRef.current
             ) {
                 return;
             }
@@ -496,6 +737,12 @@ function SortingVisualizer() {
                 end,
             ]);
 
+            if (
+                soundEnabledRef.current
+            ) {
+                playMoveSound(arr[j]);
+            }
+
             if (arr[j] <= pivot) {
 
                 i++;
@@ -531,6 +778,19 @@ function SortingVisualizer() {
                         return start;
                     }
                 }
+            }
+
+            const comparisonDelay =
+                await sleep(
+                    Math.max(
+                        speed * 0.35,
+                        10
+                    ),
+                    currentRun
+                );
+
+            if (!comparisonDelay) {
+                return start;
             }
         }
 
@@ -619,6 +879,10 @@ function SortingVisualizer() {
                     j + 1,
                 ]);
 
+                playMoveSound(
+                    arr[j]
+                );
+
                 if (
                     arr[j] >
                     arr[j + 1]
@@ -642,16 +906,16 @@ function SortingVisualizer() {
                         [j, j + 1],
                         arr[j]
                     );
+                }
 
-                    const completed =
-                        await sleep(
-                            speed,
-                            currentRun
-                        );
+                const completed =
+                    await sleep(
+                        speed,
+                        currentRun
+                    );
 
-                    if (!completed) {
-                        return;
-                    }
+                if (!completed) {
+                    return;
                 }
             }
         }
@@ -704,6 +968,10 @@ function SortingVisualizer() {
                     j,
                     j + 1,
                 ]);
+
+                playMoveSound(
+                    arr[j]
+                );
 
                 if (arr[j] > key) {
 
@@ -812,6 +1080,10 @@ function SortingVisualizer() {
                     j,
                 ]);
 
+                playMoveSound(
+                    arr[j]
+                );
+
                 const completed =
                     await sleep(
                         Math.max(
@@ -880,7 +1152,8 @@ function SortingVisualizer() {
 
         if (
             stoppedRef.current ||
-            currentRun !== sortRunRef.current
+            currentRun !==
+                sortRunRef.current
         ) {
             return;
         }
@@ -912,7 +1185,8 @@ function SortingVisualizer() {
 
         if (
             stoppedRef.current ||
-            currentRun !== sortRunRef.current
+            currentRun !==
+                sortRunRef.current
         ) {
             return;
         }
@@ -926,7 +1200,8 @@ function SortingVisualizer() {
 
         if (
             stoppedRef.current ||
-            currentRun !== sortRunRef.current
+            currentRun !==
+                sortRunRef.current
         ) {
             return;
         }
@@ -987,6 +1262,13 @@ function SortingVisualizer() {
                 left + i,
                 middle + 1 + j,
             ]);
+
+            playMoveSound(
+                Math.max(
+                    leftArray[i],
+                    rightArray[j]
+                )
+            );
 
             if (
                 leftArray[i] <=
@@ -1126,20 +1408,13 @@ function SortingVisualizer() {
             return;
         }
 
-        /*
-         * Si ya estaba ordenado, al pulsar
-         * "Ordenar nuevamente" generamos
-         * una nueva distribución.
-         */
         if (isSorted) {
+
             generateNewData(barCount);
 
-            // Esperamos a que React actualice
-            // los datos antes de iniciar.
             return;
         }
 
-        // Nueva ejecución
         const currentRun =
             ++sortRunRef.current;
 
@@ -1155,32 +1430,40 @@ function SortingVisualizer() {
         setSwaps(0);
 
         // =========================
+        // REINICIAR Y COMENZAR TIMER
+        // =========================
+
+        resetTimer();
+
+        // El timer comienza justo antes
+        // de iniciar el algoritmo.
+        startTimer();
+
+        // =========================
         // INICIAR AUDIO
         // =========================
 
         try {
 
-            if (!audioContextRef.current) {
+            if (soundEnabledRef.current) {
 
-                audioContextRef.current =
-                    new (
-                        window.AudioContext ||
-                        window.webkitAudioContext
-                    )();
-            }
+                const audioContext =
+                    getAudioContext();
 
-            if (
-                audioContextRef.current.state ===
-                "suspended"
-            ) {
-
-                await audioContextRef.current.resume();
+                if (
+                    audioContext &&
+                    audioContext.state ===
+                        "suspended"
+                ) {
+                    await audioContext.resume();
+                }
             }
 
         } catch (error) {
 
             console.log(
-                "No se pudo iniciar audio"
+                "No se pudo iniciar audio:",
+                error
             );
         }
 
@@ -1243,14 +1526,19 @@ function SortingVisualizer() {
                     break;
             }
 
-            // Solo la ejecución vigente puede terminar
             if (
                 !stoppedRef.current &&
-                currentRun === sortRunRef.current
+                currentRun ===
+                    sortRunRef.current
             ) {
+
+                // Detenemos el cronómetro
+                // exactamente al terminar.
+                stopTimer();
 
                 setData([...arr]);
                 setActiveIndices([]);
+
                 setIsSorted(true);
                 setIsSorting(false);
                 setIsPaused(false);
@@ -1265,8 +1553,11 @@ function SortingVisualizer() {
                 error
             );
 
+            stopTimer();
+
             if (
-                currentRun === sortRunRef.current
+                currentRun ===
+                sortRunRef.current
             ) {
 
                 setIsSorting(false);
@@ -1505,6 +1796,61 @@ function SortingVisualizer() {
                         flex-wrap
                     ">
 
+                        {/* SONIDO */}
+
+                        <button
+                            onClick={toggleSound}
+                            title={
+                                soundEnabled
+                                    ? "Desactivar sonido"
+                                    : "Activar sonido"
+                            }
+                            className={`
+                                h-8
+                                px-3
+                                rounded-full
+                                border
+                                transition
+                                flex
+                                items-center
+                                justify-center
+                                gap-1.5
+                                text-xs
+                                font-medium
+
+                                ${
+                                    soundEnabled
+                                        ? `
+                                            bg-sky-500/10
+                                            border-sky-500/20
+                                            text-sky-400
+                                            hover:bg-sky-500/20
+                                            hover:border-sky-500/30
+                                        `
+                                        : `
+                                            bg-slate-800
+                                            border-slate-700
+                                            text-slate-500
+                                            hover:bg-slate-700
+                                            hover:text-slate-300
+                                        `
+                                }
+                            `}
+                        >
+
+                            {soundEnabled ? (
+                                <Volume2 size={14} />
+                            ) : (
+                                <VolumeX size={14} />
+                            )}
+
+                            {soundEnabled
+                                ? "Sonido"
+                                : "Silencio"
+                            }
+
+                        </button>
+
                         <span className="
                             text-xs
                             px-3
@@ -1692,7 +2038,7 @@ function SortingVisualizer() {
                                                     `${Math.max(
                                                         100 /
                                                             data.length -
-                                                        3,
+                                                            3,
                                                         2
                                                     )}%`,
                                                 margin:
@@ -1992,10 +2338,11 @@ function SortingVisualizer() {
 
                     <div className="
                         grid
-                        grid-cols-3
+                        grid-cols-2
                         gap-2
                         sm:gap-3
                         md:gap-4
+                        lg:grid-cols-4
                     ">
 
                         {/* COMPARACIONES */}
@@ -2018,9 +2365,7 @@ function SortingVisualizer() {
                                 gap-1
                             ">
 
-                                <div className="
-                                    min-w-0
-                                ">
+                                <div className="min-w-0">
 
                                     <p className="
                                         text-[9px]
@@ -2070,7 +2415,6 @@ function SortingVisualizer() {
                                             md:w-[21px]
                                             md:h-[21px]
                                         "
-                                        strokeWidth={2}
                                     />
 
                                 </div>
@@ -2099,9 +2443,7 @@ function SortingVisualizer() {
                                 gap-1
                             ">
 
-                                <div className="
-                                    min-w-0
-                                ">
+                                <div className="min-w-0">
 
                                     <p className="
                                         text-[9px]
@@ -2151,7 +2493,6 @@ function SortingVisualizer() {
                                             md:w-[21px]
                                             md:h-[21px]
                                         "
-                                        strokeWidth={2}
                                     />
 
                                 </div>
@@ -2180,9 +2521,7 @@ function SortingVisualizer() {
                                 gap-1
                             ">
 
-                                <div className="
-                                    min-w-0
-                                ">
+                                <div className="min-w-0">
 
                                     <p className="
                                         text-[9px]
@@ -2232,7 +2571,87 @@ function SortingVisualizer() {
                                             md:w-[21px]
                                             md:h-[21px]
                                         "
-                                        strokeWidth={2}
+                                    />
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        {/* TIEMPO */}
+
+                        <div className="
+                            bg-slate-950
+                            border
+                            border-slate-800
+                            rounded-xl
+                            sm:rounded-2xl
+                            p-2.5
+                            sm:p-4
+                            md:p-5
+                        ">
+
+                            <div className="
+                                flex
+                                items-center
+                                justify-between
+                                gap-1
+                            ">
+
+                                <div className="min-w-0">
+
+                                    <p className="
+                                        text-[9px]
+                                        sm:text-xs
+                                        md:text-sm
+                                        text-slate-500
+                                        truncate
+                                    ">
+                                        Tiempo
+                                    </p>
+
+                                    <p className="
+                                        text-base
+                                        sm:text-2xl
+                                        md:text-3xl
+                                        font-bold
+                                        mt-0.5
+                                        sm:mt-1
+                                        text-amber-400
+                                    ">
+                                        {formatTime(
+                                            elapsedTime
+                                        )}
+                                    </p>
+
+                                </div>
+
+                                <div className="
+                                    w-7
+                                    h-7
+                                    sm:w-9
+                                    sm:h-9
+                                    md:w-11
+                                    md:h-11
+                                    shrink-0
+                                    rounded-lg
+                                    sm:rounded-xl
+                                    bg-amber-500/10
+                                    flex
+                                    items-center
+                                    justify-center
+                                    text-amber-400
+                                ">
+
+                                    <Clock
+                                        size={14}
+                                        className="
+                                            sm:w-[17px]
+                                            sm:h-[17px]
+                                            md:w-[21px]
+                                            md:h-[21px]
+                                        "
                                     />
 
                                 </div>
@@ -2269,12 +2688,8 @@ function SortingVisualizer() {
                         {/* GENERAR */}
 
                         <button
-                            onClick={
-                                generateData
-                            }
-                            disabled={
-                                isSorting
-                            }
+                            onClick={generateData}
+                            disabled={isSorting}
                             className="
                                 h-11
                                 sm:h-12
@@ -2297,9 +2712,7 @@ function SortingVisualizer() {
                             "
                         >
 
-                            <RotateCcw
-                                size={17}
-                            />
+                            <RotateCcw size={17} />
 
                             Generar datos
 
@@ -2351,12 +2764,8 @@ function SortingVisualizer() {
                         ) : (
 
                             <button
-                                onClick={
-                                    pauseSorting
-                                }
-                                disabled={
-                                    isPaused
-                                }
+                                onClick={pauseSorting}
+                                disabled={isPaused}
                                 className="
                                     h-11
                                     sm:h-12
@@ -2390,9 +2799,7 @@ function SortingVisualizer() {
 
                         {/* ALGORITMO */}
 
-                        <div className="
-                            relative
-                        ">
+                        <div className="relative">
 
                             <select
                                 value={algorithm}
@@ -2576,6 +2983,8 @@ function SortingVisualizer() {
                 sm:gap-4
             ">
 
+                {/* PROMEDIO */}
+
                 <div className="
                     p-4
                     sm:p-5
@@ -2613,6 +3022,8 @@ function SortingVisualizer() {
 
                 </div>
 
+                {/* PEOR CASO */}
+
                 <div className="
                     p-4
                     sm:p-5
@@ -2649,6 +3060,8 @@ function SortingVisualizer() {
                     </p>
 
                 </div>
+
+                {/* RENDIMIENTO */}
 
                 <div className="
                     p-4
