@@ -30,46 +30,27 @@ function SortingVisualizer() {
     // =========================
 
     const [data, setData] = useState([]);
+    const [comparisons, setComparisons] = useState(0);
+    const [swaps, setSwaps] = useState(0);
+    const [speed, setSpeed] = useState(100);
+    const [algorithm, setAlgorithm] = useState("Quick Sort");
+    const [barCount, setBarCount] = useState(40);
 
-    const [comparisons, setComparisons] =
-        useState(0);
-
-    const [swaps, setSwaps] =
-        useState(0);
-
-    const [speed, setSpeed] =
-        useState(100);
-
-    const [algorithm, setAlgorithm] =
-        useState("Quick Sort");
-
-    const [barCount, setBarCount] =
-        useState(40);
-
-    const [isSorting, setIsSorting] =
-        useState(false);
-
-    const [isPaused, setIsPaused] =
-        useState(false);
-
-    const [isSorted, setIsSorted] =
-        useState(false);
-
-    const [activeIndices, setActiveIndices] =
-        useState([]);
+    const [isSorting, setIsSorting] = useState(false);
+    const [isPaused, setIsPaused] = useState(false);
+    const [isSorted, setIsSorted] = useState(false);
+    const [activeIndices, setActiveIndices] = useState([]);
 
     // =========================
     // REFS
     // =========================
 
-    const pausedRef =
-        useRef(false);
+    const pausedRef = useRef(false);
+    const stoppedRef = useRef(false);
+    const audioContextRef = useRef(null);
 
-    const stoppedRef =
-        useRef(false);
-
-    const audioContextRef =
-        useRef(null);
+    // Identifica cada ejecución.
+    const sortRunRef = useRef(0);
 
     // =========================
     // GENERAR DATOS
@@ -90,17 +71,44 @@ function SortingVisualizer() {
         );
 
         setData(arr);
-
         setComparisons(0);
         setSwaps(0);
-
         setIsSorted(false);
         setIsPaused(false);
-
         setActiveIndices([]);
 
         pausedRef.current = false;
         stoppedRef.current = false;
+
+        // Invalidar cualquier ejecución anterior
+        sortRunRef.current += 1;
+    };
+
+    // =========================
+    // GENERAR DATOS NUEVOS
+    // =========================
+
+    const generateNewData = (amount = barCount) => {
+
+        const arr = Array.from(
+            { length: amount },
+            () =>
+                Math.floor(
+                    Math.random() * 350
+                ) + 30
+        );
+
+        setData(arr);
+        setComparisons(0);
+        setSwaps(0);
+        setIsSorted(false);
+        setIsPaused(false);
+        setActiveIndices([]);
+
+        pausedRef.current = false;
+        stoppedRef.current = false;
+
+        sortRunRef.current += 1;
     };
 
     // =========================
@@ -109,30 +117,40 @@ function SortingVisualizer() {
 
     const handleBarCountChange = (e) => {
 
-        const amount =
-            Number(e.target.value);
+        const amount = Number(e.target.value);
 
         setBarCount(amount);
 
         if (!isSorting) {
+            generateNewData(amount);
+        }
+    };
 
-            const arr = Array.from(
-                { length: amount },
-                () =>
-                    Math.floor(
-                        Math.random() * 350
-                    ) + 30
-            );
+    // =========================
+    // CAMBIAR ALGORITMO
+    // =========================
 
-            setData(arr);
+    const handleAlgorithmChange = (e) => {
 
+        const newAlgorithm = e.target.value;
+
+        setAlgorithm(newAlgorithm);
+
+        /*
+         * Si el algoritmo anterior ya terminó,
+         * los datos están ordenados.
+         *
+         * Al cambiar de algoritmo generamos
+         * automáticamente nuevos datos para
+         * que el nuevo algoritmo pueda visualizarse.
+         */
+        if (isSorted) {
+            generateNewData(barCount);
+        } else {
+            setIsSorted(false);
             setComparisons(0);
             setSwaps(0);
-            setIsSorted(false);
             setActiveIndices([]);
-
-            pausedRef.current = false;
-            stoppedRef.current = false;
         }
     };
 
@@ -140,9 +158,7 @@ function SortingVisualizer() {
     // AUDIO
     // =========================
 
-    const playMoveSound = (
-        value = 200
-    ) => {
+    const playMoveSound = (value = 200) => {
 
         try {
 
@@ -159,8 +175,7 @@ function SortingVisualizer() {
                 audioContextRef.current;
 
             if (
-                audioContext.state ===
-                "suspended"
+                audioContext.state === "suspended"
             ) {
                 audioContext.resume();
             }
@@ -175,10 +190,7 @@ function SortingVisualizer() {
                 150 + value * 2;
 
             oscillator.frequency.value =
-                Math.min(
-                    frequency,
-                    900
-                );
+                Math.min(frequency, 900);
 
             oscillator.type = "sine";
 
@@ -189,21 +201,16 @@ function SortingVisualizer() {
 
             gain.gain.exponentialRampToValueAtTime(
                 0.001,
-                audioContext.currentTime +
-                0.07
+                audioContext.currentTime + 0.07
             );
 
             oscillator.connect(gain);
-
-            gain.connect(
-                audioContext.destination
-            );
+            gain.connect(audioContext.destination);
 
             oscillator.start();
 
             oscillator.stop(
-                audioContext.currentTime +
-                0.07
+                audioContext.currentTime + 0.07
             );
 
         } catch (error) {
@@ -219,26 +226,27 @@ function SortingVisualizer() {
     // ESPERA
     // =========================
 
-    const sleep = async (ms) => {
+    const sleep = async (
+        ms,
+        currentRun
+    ) => {
 
         let elapsed = 0;
 
-        while (
-            elapsed < ms
-        ) {
+        while (elapsed < ms) {
 
             if (
-                stoppedRef.current
+                stoppedRef.current ||
+                currentRun !== sortRunRef.current
             ) {
                 return false;
             }
 
-            while (
-                pausedRef.current
-            ) {
+            while (pausedRef.current) {
 
                 if (
-                    stoppedRef.current
+                    stoppedRef.current ||
+                    currentRun !== sortRunRef.current
                 ) {
                     return false;
                 }
@@ -252,35 +260,42 @@ function SortingVisualizer() {
                 );
             }
 
+            const step =
+                Math.min(
+                    20,
+                    ms - elapsed
+                );
+
             await new Promise(
                 (resolve) =>
                     setTimeout(
                         resolve,
-                        Math.min(
-                            20,
-                            ms - elapsed
-                        )
+                        step
                     )
             );
 
-            elapsed += 20;
+            elapsed += step;
         }
 
-        return true;
+        return (
+            !stoppedRef.current &&
+            currentRun === sortRunRef.current
+        );
     };
 
     // =========================
     // ESPERAR PAUSA
     // =========================
 
-    const waitIfPaused = async () => {
+    const waitIfPaused = async (
+        currentRun
+    ) => {
 
-        while (
-            pausedRef.current
-        ) {
+        while (pausedRef.current) {
 
             if (
-                stoppedRef.current
+                stoppedRef.current ||
+                currentRun !== sortRunRef.current
             ) {
                 return false;
             }
@@ -295,7 +310,8 @@ function SortingVisualizer() {
         }
 
         if (
-            stoppedRef.current
+            stoppedRef.current ||
+            currentRun !== sortRunRef.current
         ) {
             return false;
         }
@@ -313,7 +329,6 @@ function SortingVisualizer() {
     ) => {
 
         setActiveIndices(indices);
-
         playMoveSound(value);
     };
 
@@ -323,8 +338,11 @@ function SortingVisualizer() {
 
     const pauseSorting = () => {
 
-        pausedRef.current = true;
+        if (!isSorting) {
+            return;
+        }
 
+        pausedRef.current = true;
         setIsPaused(true);
     };
 
@@ -334,8 +352,11 @@ function SortingVisualizer() {
 
     const continueSorting = () => {
 
-        pausedRef.current = false;
+        if (!isSorting) {
+            return;
+        }
 
+        pausedRef.current = false;
         setIsPaused(false);
     };
 
@@ -345,22 +366,21 @@ function SortingVisualizer() {
 
     const stopAndRestart = () => {
 
-        stoppedRef.current = true;
+        // Invalidar inmediatamente la ejecución actual
+        sortRunRef.current += 1;
 
+        stoppedRef.current = true;
         pausedRef.current = false;
 
-        setIsPaused(false);
-
         setIsSorting(false);
-
+        setIsPaused(false);
         setIsSorted(false);
-
         setActiveIndices([]);
 
         setComparisons(0);
-
         setSwaps(0);
 
+        // Crear datos completamente nuevos
         const arr = Array.from(
             { length: barCount },
             () =>
@@ -371,9 +391,7 @@ function SortingVisualizer() {
 
         setData(arr);
 
-        setTimeout(() => {
-            stoppedRef.current = false;
-        }, 50);
+        stoppedRef.current = false;
     };
 
     // =========================
@@ -383,25 +401,25 @@ function SortingVisualizer() {
     const quickSort = async (
         arr,
         start,
-        end
+        end,
+        currentRun
     ) => {
 
         if (
-            stoppedRef.current
+            stoppedRef.current ||
+            currentRun !== sortRunRef.current
         ) {
             return;
         }
 
-        if (
-            start < end
-        ) {
+        if (start < end) {
 
             const canContinue =
-                await waitIfPaused();
+                await waitIfPaused(
+                    currentRun
+                );
 
-            if (
-                !canContinue
-            ) {
+            if (!canContinue) {
                 return;
             }
 
@@ -409,11 +427,13 @@ function SortingVisualizer() {
                 await partition(
                     arr,
                     start,
-                    end
+                    end,
+                    currentRun
                 );
 
             if (
-                stoppedRef.current
+                stoppedRef.current ||
+                currentRun !== sortRunRef.current
             ) {
                 return;
             }
@@ -421,11 +441,13 @@ function SortingVisualizer() {
             await quickSort(
                 arr,
                 start,
-                pivotIndex - 1
+                pivotIndex - 1,
+                currentRun
             );
 
             if (
-                stoppedRef.current
+                stoppedRef.current ||
+                currentRun !== sortRunRef.current
             ) {
                 return;
             }
@@ -433,7 +455,8 @@ function SortingVisualizer() {
             await quickSort(
                 arr,
                 pivotIndex + 1,
-                end
+                end,
+                currentRun
             );
         }
     };
@@ -441,14 +464,13 @@ function SortingVisualizer() {
     const partition = async (
         arr,
         start,
-        end
+        end,
+        currentRun
     ) => {
 
-        const pivot =
-            arr[end];
+        const pivot = arr[end];
 
-        let i =
-            start - 1;
+        let i = start - 1;
 
         for (
             let j = start;
@@ -457,11 +479,11 @@ function SortingVisualizer() {
         ) {
 
             const canContinue =
-                await waitIfPaused();
+                await waitIfPaused(
+                    currentRun
+                );
 
-            if (
-                !canContinue
-            ) {
+            if (!canContinue) {
                 return start;
             }
 
@@ -474,15 +496,11 @@ function SortingVisualizer() {
                 end,
             ]);
 
-            if (
-                arr[j] <= pivot
-            ) {
+            if (arr[j] <= pivot) {
 
                 i++;
 
-                if (
-                    i !== j
-                ) {
+                if (i !== j) {
 
                     [
                         arr[i],
@@ -496,9 +514,7 @@ function SortingVisualizer() {
                         (s) => s + 1
                     );
 
-                    setData([
-                        ...arr,
-                    ]);
+                    setData([...arr]);
 
                     showMovement(
                         [i, j],
@@ -507,12 +523,11 @@ function SortingVisualizer() {
 
                     const completed =
                         await sleep(
-                            speed
+                            speed,
+                            currentRun
                         );
 
-                    if (
-                        !completed
-                    ) {
+                    if (!completed) {
                         return start;
                     }
                 }
@@ -520,17 +535,15 @@ function SortingVisualizer() {
         }
 
         const canContinue =
-            await waitIfPaused();
+            await waitIfPaused(
+                currentRun
+            );
 
-        if (
-            !canContinue
-        ) {
+        if (!canContinue) {
             return start;
         }
 
-        if (
-            i + 1 !== end
-        ) {
+        if (i + 1 !== end) {
 
             [
                 arr[i + 1],
@@ -544,26 +557,20 @@ function SortingVisualizer() {
                 (s) => s + 1
             );
 
-            setData([
-                ...arr,
-            ]);
+            setData([...arr]);
 
             showMovement(
-                [
-                    i + 1,
-                    end,
-                ],
+                [i + 1, end],
                 arr[i + 1]
             );
 
             const completed =
                 await sleep(
-                    speed
+                    speed,
+                    currentRun
                 );
 
-            if (
-                !completed
-            ) {
+            if (!completed) {
                 return start;
             }
         }
@@ -576,11 +583,11 @@ function SortingVisualizer() {
     // =========================
 
     const bubbleSort = async (
-        arr
+        arr,
+        currentRun
     ) => {
 
-        const n =
-            arr.length;
+        const n = arr.length;
 
         for (
             let i = 0;
@@ -595,11 +602,11 @@ function SortingVisualizer() {
             ) {
 
                 const canContinue =
-                    await waitIfPaused();
+                    await waitIfPaused(
+                        currentRun
+                    );
 
-                if (
-                    !canContinue
-                ) {
+                if (!canContinue) {
                     return;
                 }
 
@@ -629,26 +636,20 @@ function SortingVisualizer() {
                         (s) => s + 1
                     );
 
-                    setData([
-                        ...arr,
-                    ]);
+                    setData([...arr]);
 
                     showMovement(
-                        [
-                            j,
-                            j + 1,
-                        ],
+                        [j, j + 1],
                         arr[j]
                     );
 
                     const completed =
                         await sleep(
-                            speed
+                            speed,
+                            currentRun
                         );
 
-                    if (
-                        !completed
-                    ) {
+                    if (!completed) {
                         return;
                     }
                 }
@@ -661,7 +662,8 @@ function SortingVisualizer() {
     // =========================
 
     const insertionSort = async (
-        arr
+        arr,
+        currentRun
     ) => {
 
         for (
@@ -671,30 +673,26 @@ function SortingVisualizer() {
         ) {
 
             const canContinue =
-                await waitIfPaused();
+                await waitIfPaused(
+                    currentRun
+                );
 
-            if (
-                !canContinue
-            ) {
+            if (!canContinue) {
                 return;
             }
 
-            const key =
-                arr[i];
+            const key = arr[i];
 
-            let j =
-                i - 1;
+            let j = i - 1;
 
-            while (
-                j >= 0
-            ) {
+            while (j >= 0) {
 
                 const canContinue =
-                    await waitIfPaused();
+                    await waitIfPaused(
+                        currentRun
+                    );
 
-                if (
-                    !canContinue
-                ) {
+                if (!canContinue) {
                     return;
                 }
 
@@ -707,9 +705,7 @@ function SortingVisualizer() {
                     j + 1,
                 ]);
 
-                if (
-                    arr[j] > key
-                ) {
+                if (arr[j] > key) {
 
                     arr[j + 1] =
                         arr[j];
@@ -718,26 +714,20 @@ function SortingVisualizer() {
                         (s) => s + 1
                     );
 
-                    setData([
-                        ...arr,
-                    ]);
+                    setData([...arr]);
 
                     showMovement(
-                        [
-                            j,
-                            j + 1,
-                        ],
+                        [j, j + 1],
                         arr[j + 1]
                     );
 
                     const completed =
                         await sleep(
-                            speed
+                            speed,
+                            currentRun
                         );
 
-                    if (
-                        !completed
-                    ) {
+                    if (!completed) {
                         return;
                     }
 
@@ -749,12 +739,9 @@ function SortingVisualizer() {
                 }
             }
 
-            arr[j + 1] =
-                key;
+            arr[j + 1] = key;
 
-            setData([
-                ...arr,
-            ]);
+            setData([...arr]);
 
             showMovement(
                 [j + 1],
@@ -763,12 +750,11 @@ function SortingVisualizer() {
 
             const completed =
                 await sleep(
-                    speed
+                    speed,
+                    currentRun
                 );
 
-            if (
-                !completed
-            ) {
+            if (!completed) {
                 return;
             }
         }
@@ -779,11 +765,11 @@ function SortingVisualizer() {
     // =========================
 
     const selectionSort = async (
-        arr
+        arr,
+        currentRun
     ) => {
 
-        const n =
-            arr.length;
+        const n = arr.length;
 
         for (
             let i = 0;
@@ -792,16 +778,15 @@ function SortingVisualizer() {
         ) {
 
             const canContinue =
-                await waitIfPaused();
+                await waitIfPaused(
+                    currentRun
+                );
 
-            if (
-                !canContinue
-            ) {
+            if (!canContinue) {
                 return;
             }
 
-            let minIndex =
-                i;
+            let minIndex = i;
 
             for (
                 let j = i + 1;
@@ -810,11 +795,11 @@ function SortingVisualizer() {
             ) {
 
                 const canContinue =
-                    await waitIfPaused();
+                    await waitIfPaused(
+                        currentRun
+                    );
 
-                if (
-                    !canContinue
-                ) {
+                if (!canContinue) {
                     return;
                 }
 
@@ -832,12 +817,11 @@ function SortingVisualizer() {
                         Math.max(
                             speed / 2,
                             10
-                        )
+                        ),
+                        currentRun
                     );
 
-                if (
-                    !completed
-                ) {
+                if (!completed) {
                     return;
                 }
 
@@ -845,14 +829,11 @@ function SortingVisualizer() {
                     arr[j] <
                     arr[minIndex]
                 ) {
-                    minIndex =
-                        j;
+                    minIndex = j;
                 }
             }
 
-            if (
-                minIndex !== i
-            ) {
+            if (minIndex !== i) {
 
                 [
                     arr[i],
@@ -866,26 +847,20 @@ function SortingVisualizer() {
                     (s) => s + 1
                 );
 
-                setData([
-                    ...arr,
-                ]);
+                setData([...arr]);
 
                 showMovement(
-                    [
-                        i,
-                        minIndex,
-                    ],
+                    [i, minIndex],
                     arr[i]
                 );
 
                 const completed =
                     await sleep(
-                        speed
+                        speed,
+                        currentRun
                     );
 
-                if (
-                    !completed
-                ) {
+                if (!completed) {
                     return;
                 }
             }
@@ -899,27 +874,27 @@ function SortingVisualizer() {
     const mergeSort = async (
         arr,
         left,
-        right
+        right,
+        currentRun
     ) => {
 
         if (
-            stoppedRef.current
+            stoppedRef.current ||
+            currentRun !== sortRunRef.current
         ) {
             return;
         }
 
-        if (
-            left >= right
-        ) {
+        if (left >= right) {
             return;
         }
 
         const canContinue =
-            await waitIfPaused();
+            await waitIfPaused(
+                currentRun
+            );
 
-        if (
-            !canContinue
-        ) {
+        if (!canContinue) {
             return;
         }
 
@@ -931,11 +906,13 @@ function SortingVisualizer() {
         await mergeSort(
             arr,
             left,
-            middle
+            middle,
+            currentRun
         );
 
         if (
-            stoppedRef.current
+            stoppedRef.current ||
+            currentRun !== sortRunRef.current
         ) {
             return;
         }
@@ -943,11 +920,13 @@ function SortingVisualizer() {
         await mergeSort(
             arr,
             middle + 1,
-            right
+            right,
+            currentRun
         );
 
         if (
-            stoppedRef.current
+            stoppedRef.current ||
+            currentRun !== sortRunRef.current
         ) {
             return;
         }
@@ -956,7 +935,8 @@ function SortingVisualizer() {
             arr,
             left,
             middle,
-            right
+            right,
+            currentRun
         );
     };
 
@@ -964,7 +944,8 @@ function SortingVisualizer() {
         arr,
         left,
         middle,
-        right
+        right,
+        currentRun
     ) => {
 
         const leftArray =
@@ -984,18 +965,16 @@ function SortingVisualizer() {
         let k = left;
 
         while (
-            i <
-            leftArray.length &&
-            j <
-            rightArray.length
+            i < leftArray.length &&
+            j < rightArray.length
         ) {
 
             const canContinue =
-                await waitIfPaused();
+                await waitIfPaused(
+                    currentRun
+                );
 
-            if (
-                !canContinue
-            ) {
+            if (!canContinue) {
                 return;
             }
 
@@ -1031,9 +1010,7 @@ function SortingVisualizer() {
                 (s) => s + 1
             );
 
-            setData([
-                ...arr,
-            ]);
+            setData([...arr]);
 
             showMovement(
                 [k],
@@ -1042,12 +1019,11 @@ function SortingVisualizer() {
 
             const completed =
                 await sleep(
-                    speed
+                    speed,
+                    currentRun
                 );
 
-            if (
-                !completed
-            ) {
+            if (!completed) {
                 return;
             }
 
@@ -1055,16 +1031,15 @@ function SortingVisualizer() {
         }
 
         while (
-            i <
-            leftArray.length
+            i < leftArray.length
         ) {
 
             const canContinue =
-                await waitIfPaused();
+                await waitIfPaused(
+                    currentRun
+                );
 
-            if (
-                !canContinue
-            ) {
+            if (!canContinue) {
                 return;
             }
 
@@ -1078,9 +1053,7 @@ function SortingVisualizer() {
                 (s) => s + 1
             );
 
-            setData([
-                ...arr,
-            ]);
+            setData([...arr]);
 
             showMovement(
                 [k - 1],
@@ -1089,27 +1062,25 @@ function SortingVisualizer() {
 
             const completed =
                 await sleep(
-                    speed
+                    speed,
+                    currentRun
                 );
 
-            if (
-                !completed
-            ) {
+            if (!completed) {
                 return;
             }
         }
 
         while (
-            j <
-            rightArray.length
+            j < rightArray.length
         ) {
 
             const canContinue =
-                await waitIfPaused();
+                await waitIfPaused(
+                    currentRun
+                );
 
-            if (
-                !canContinue
-            ) {
+            if (!canContinue) {
                 return;
             }
 
@@ -1123,9 +1094,7 @@ function SortingVisualizer() {
                 (s) => s + 1
             );
 
-            setData([
-                ...arr,
-            ]);
+            setData([...arr]);
 
             showMovement(
                 [k - 1],
@@ -1134,12 +1103,11 @@ function SortingVisualizer() {
 
             const completed =
                 await sleep(
-                    speed
+                    speed,
+                    currentRun
                 );
 
-            if (
-                !completed
-            ) {
+            if (!completed) {
                 return;
             }
         }
@@ -1158,6 +1126,23 @@ function SortingVisualizer() {
             return;
         }
 
+        /*
+         * Si ya estaba ordenado, al pulsar
+         * "Ordenar nuevamente" generamos
+         * una nueva distribución.
+         */
+        if (isSorted) {
+            generateNewData(barCount);
+
+            // Esperamos a que React actualice
+            // los datos antes de iniciar.
+            return;
+        }
+
+        // Nueva ejecución
+        const currentRun =
+            ++sortRunRef.current;
+
         setIsSorting(true);
         setIsPaused(false);
         setIsSorted(false);
@@ -1169,11 +1154,13 @@ function SortingVisualizer() {
         setComparisons(0);
         setSwaps(0);
 
+        // =========================
+        // INICIAR AUDIO
+        // =========================
+
         try {
 
-            if (
-                !audioContextRef.current
-            ) {
+            if (!audioContextRef.current) {
 
                 audioContextRef.current =
                     new (
@@ -1197,21 +1184,19 @@ function SortingVisualizer() {
             );
         }
 
-        const arr =
-            [...data];
+        const arr = [...data];
 
         try {
 
-            switch (
-                algorithm
-            ) {
+            switch (algorithm) {
 
                 case "Quick Sort":
 
                     await quickSort(
                         arr,
                         0,
-                        arr.length - 1
+                        arr.length - 1,
+                        currentRun
                     );
 
                     break;
@@ -1219,7 +1204,8 @@ function SortingVisualizer() {
                 case "Bubble Sort":
 
                     await bubbleSort(
-                        arr
+                        arr,
+                        currentRun
                     );
 
                     break;
@@ -1227,7 +1213,8 @@ function SortingVisualizer() {
                 case "Insertion Sort":
 
                     await insertionSort(
-                        arr
+                        arr,
+                        currentRun
                     );
 
                     break;
@@ -1235,7 +1222,8 @@ function SortingVisualizer() {
                 case "Selection Sort":
 
                     await selectionSort(
-                        arr
+                        arr,
+                        currentRun
                     );
 
                     break;
@@ -1245,7 +1233,8 @@ function SortingVisualizer() {
                     await mergeSort(
                         arr,
                         0,
-                        arr.length - 1
+                        arr.length - 1,
+                        currentRun
                     );
 
                     break;
@@ -1254,17 +1243,19 @@ function SortingVisualizer() {
                     break;
             }
 
+            // Solo la ejecución vigente puede terminar
             if (
-                !stoppedRef.current
+                !stoppedRef.current &&
+                currentRun === sortRunRef.current
             ) {
 
-                setData([
-                    ...arr,
-                ]);
-
+                setData([...arr]);
                 setActiveIndices([]);
-
                 setIsSorted(true);
+                setIsSorting(false);
+                setIsPaused(false);
+
+                pausedRef.current = false;
             }
 
         } catch (error) {
@@ -1273,16 +1264,14 @@ function SortingVisualizer() {
                 "Error al ordenar:",
                 error
             );
-        }
 
-        if (
-            !stoppedRef.current
-        ) {
+            if (
+                currentRun === sortRunRef.current
+            ) {
 
-            setIsSorting(false);
-            setIsPaused(false);
-
-            pausedRef.current = false;
+                setIsSorting(false);
+                setIsPaused(false);
+            }
         }
     };
 
@@ -1292,19 +1281,14 @@ function SortingVisualizer() {
 
     const getAlgorithmInfo = () => {
 
-        switch (
-            algorithm
-        ) {
+        switch (algorithm) {
 
             case "Quick Sort":
 
                 return {
-                    average:
-                        "O(n log n)",
-                    worst:
-                        "O(n²)",
-                    performance:
-                        "Muy rápido",
+                    average: "O(n log n)",
+                    worst: "O(n²)",
+                    performance: "Muy rápido",
                     description:
                         "Divide los datos usando un pivote.",
                 };
@@ -1312,12 +1296,9 @@ function SortingVisualizer() {
             case "Bubble Sort":
 
                 return {
-                    average:
-                        "O(n²)",
-                    worst:
-                        "O(n²)",
-                    performance:
-                        "Lento",
+                    average: "O(n²)",
+                    worst: "O(n²)",
+                    performance: "Lento",
                     description:
                         "Compara elementos vecinos y los intercambia.",
                 };
@@ -1325,10 +1306,8 @@ function SortingVisualizer() {
             case "Insertion Sort":
 
                 return {
-                    average:
-                        "O(n²)",
-                    worst:
-                        "O(n²)",
+                    average: "O(n²)",
+                    worst: "O(n²)",
                     performance:
                         "Bueno para pocos datos",
                     description:
@@ -1338,12 +1317,9 @@ function SortingVisualizer() {
             case "Selection Sort":
 
                 return {
-                    average:
-                        "O(n²)",
-                    worst:
-                        "O(n²)",
-                    performance:
-                        "Lento",
+                    average: "O(n²)",
+                    worst: "O(n²)",
+                    performance: "Lento",
                     description:
                         "Busca el elemento menor y lo coloca al inicio.",
                 };
@@ -1351,12 +1327,9 @@ function SortingVisualizer() {
             case "Merge Sort":
 
                 return {
-                    average:
-                        "O(n log n)",
-                    worst:
-                        "O(n log n)",
-                    performance:
-                        "Muy rápido",
+                    average: "O(n log n)",
+                    worst: "O(n log n)",
+                    performance: "Muy rápido",
                     description:
                         "Divide los datos y después los combina ordenadamente.",
                 };
@@ -1381,18 +1354,23 @@ function SortingVisualizer() {
 
     return (
 
-        <div className="
-            min-h-screen
-            bg-slate-950
-            text-white
-            px-4
-            py-8
-        ">
+        <div
+            className="
+                min-h-screen
+                bg-slate-950
+                text-white
+                px-3
+                sm:px-4
+                py-6
+                sm:py-8
+            "
+        >
 
             {/* HEADER */}
 
             <div className="
-                mb-8
+                mb-6
+                sm:mb-8
                 text-center
             ">
 
@@ -1400,7 +1378,8 @@ function SortingVisualizer() {
                     inline-flex
                     items-center
                     gap-2
-                    px-4
+                    px-3
+                    sm:px-4
                     py-2
                     mb-4
                     rounded-full
@@ -1408,12 +1387,13 @@ function SortingVisualizer() {
                     border
                     border-sky-400/20
                     text-sky-400
-                    text-sm
+                    text-xs
+                    sm:text-sm
                     font-medium
                 ">
 
                     <Circle
-                        size={8}
+                        size={7}
                         fill="currentColor"
                         strokeWidth={0}
                         className="animate-pulse"
@@ -1424,7 +1404,8 @@ function SortingVisualizer() {
                 </div>
 
                 <h1 className="
-                    text-4xl
+                    text-3xl
+                    sm:text-4xl
                     md:text-5xl
                     font-bold
                     tracking-tight
@@ -1441,6 +1422,8 @@ function SortingVisualizer() {
                 </h1>
 
                 <p className="
+                    text-sm
+                    sm:text-base
                     text-slate-400
                     mt-3
                     max-w-2xl
@@ -1462,7 +1445,8 @@ function SortingVisualizer() {
                 bg-slate-900/80
                 border
                 border-slate-800
-                rounded-3xl
+                rounded-2xl
+                sm:rounded-3xl
                 shadow-2xl
                 overflow-hidden
             ">
@@ -1470,8 +1454,10 @@ function SortingVisualizer() {
                 {/* HEADER CARD */}
 
                 <div className="
-                    px-6
-                    py-5
+                    px-4
+                    sm:px-6
+                    py-4
+                    sm:py-5
                     border-b
                     border-slate-800
                     flex
@@ -1485,14 +1471,16 @@ function SortingVisualizer() {
                     <div>
 
                         <h2 className="
-                            text-xl
+                            text-lg
+                            sm:text-xl
                             font-semibold
                         ">
                             Visualización
                         </h2>
 
                         <p className="
-                            text-sm
+                            text-xs
+                            sm:text-sm
                             text-slate-500
                             mt-1
                         ">
@@ -1534,6 +1522,7 @@ function SortingVisualizer() {
 
                         {isSorting &&
                             !isPaused && (
+
                                 <span className="
                                     inline-flex
                                     items-center
@@ -1556,6 +1545,7 @@ function SortingVisualizer() {
                             )}
 
                         {isPaused && (
+
                             <span className="
                                 inline-flex
                                 items-center
@@ -1578,6 +1568,7 @@ function SortingVisualizer() {
                         )}
 
                         {isSorted && (
+
                             <span className="
                                 inline-flex
                                 items-center
@@ -1606,7 +1597,8 @@ function SortingVisualizer() {
                 {/* VISUALIZADOR */}
 
                 <div className="
-                    p-4
+                    p-3
+                    sm:p-4
                     md:p-8
                 ">
 
@@ -1614,7 +1606,8 @@ function SortingVisualizer() {
                         className="
                             relative
                             w-full
-                            rounded-2xl
+                            rounded-xl
+                            sm:rounded-2xl
                             bg-slate-950
                             border
                             border-slate-800
@@ -1663,8 +1656,10 @@ function SortingVisualizer() {
                                 flex
                                 items-end
                                 justify-center
-                                px-3
-                                pb-3
+                                px-2
+                                sm:px-3
+                                pb-2
+                                sm:pb-3
                             "
                             style={{
                                 height: HEIGHT,
@@ -1696,7 +1691,7 @@ function SortingVisualizer() {
                                                 width:
                                                     `${Math.max(
                                                         100 /
-                                                        data.length -
+                                                            data.length -
                                                         3,
                                                         2
                                                     )}%`,
@@ -1704,8 +1699,6 @@ function SortingVisualizer() {
                                                     "0 1px",
                                             }}
                                         >
-
-                                            {/* BARRA */}
 
                                             <div
                                                 className={`
@@ -1715,29 +1708,30 @@ function SortingVisualizer() {
                                                     duration-150
                                                     shadow-lg
 
-                                                    ${isSorted
-                                                        ? `
-                                                            bg-gradient-to-t
-                                                            from-green-700
-                                                            via-green-500
-                                                            to-emerald-300
-                                                            shadow-green-500/20
-                                                        `
-                                                        : isActive
+                                                    ${
+                                                        isSorted
                                                             ? `
                                                                 bg-gradient-to-t
-                                                                from-red-600
-                                                                via-red-400
-                                                                to-red-200
-                                                                shadow-red-500/30
+                                                                from-green-700
+                                                                via-green-500
+                                                                to-emerald-300
+                                                                shadow-green-500/20
                                                             `
-                                                            : `
-                                                                bg-gradient-to-t
-                                                                from-sky-600
-                                                                via-sky-400
-                                                                to-cyan-300
-                                                                shadow-sky-500/10
-                                                            `
+                                                            : isActive
+                                                                ? `
+                                                                    bg-gradient-to-t
+                                                                    from-red-600
+                                                                    via-red-400
+                                                                    to-red-200
+                                                                    shadow-red-500/30
+                                                                `
+                                                                : `
+                                                                    bg-gradient-to-t
+                                                                    from-sky-600
+                                                                    via-sky-400
+                                                                    to-cyan-300
+                                                                    shadow-sky-500/10
+                                                                `
                                                     }
                                                 `}
                                                 style={{
@@ -1745,8 +1739,6 @@ function SortingVisualizer() {
                                                         `${value}px`,
                                                 }}
                                             />
-
-                                            {/* LINEA ROJA */}
 
                                             {isActive &&
                                                 !isSorted && (
@@ -1784,67 +1776,94 @@ function SortingVisualizer() {
                             <div className="
                                 absolute
                                 inset-0
+                                z-30
                                 flex
                                 items-center
                                 justify-center
-                                bg-slate-950/50
-                                backdrop-blur-[2px]
                             ">
 
                                 <div className="
-                                    px-6
-                                    py-5
-                                    rounded-2xl
+                                    flex
+                                    flex-col
+                                    sm:flex-row
+                                    items-stretch
+                                    sm:items-center
+                                    gap-2
+                                    px-3
+                                    py-3
+                                    rounded-xl
                                     bg-slate-900/95
                                     border
-                                    border-orange-500/30
-                                    shadow-2xl
-                                    text-center
+                                    border-slate-700
+                                    shadow-xl
                                 ">
 
                                     <div className="
-                                        w-12
-                                        h-12
-                                        mx-auto
-                                        mb-3
-                                        rounded-xl
-                                        bg-orange-500/10
-                                        border
-                                        border-orange-500/20
                                         flex
                                         items-center
-                                        justify-center
-                                        text-orange-400
+                                        gap-2
+                                        px-2
+                                        sm:px-3
+                                        py-1
                                     ">
 
-                                        <Pause
-                                            size={24}
-                                            strokeWidth={2.5}
-                                        />
+                                        <div className="
+                                            w-7
+                                            h-7
+                                            rounded-lg
+                                            bg-orange-500/10
+                                            border
+                                            border-orange-500/20
+                                            flex
+                                            items-center
+                                            justify-center
+                                            text-orange-400
+                                            shrink-0
+                                        ">
+
+                                            <Pause
+                                                size={15}
+                                                strokeWidth={2.5}
+                                            />
+
+                                        </div>
+
+                                        <div className="leading-tight">
+
+                                            <p className="
+                                                text-xs
+                                                font-semibold
+                                                text-orange-400
+                                            ">
+                                                Pausado
+                                            </p>
+
+                                            <p className="
+                                                hidden
+                                                sm:block
+                                                text-[10px]
+                                                text-slate-500
+                                                mt-0.5
+                                            ">
+                                                Ordenamiento detenido
+                                            </p>
+
+                                        </div>
 
                                     </div>
 
-                                    <p className="
-                                        font-bold
-                                        text-orange-400
-                                    ">
-                                        Ordenamiento pausado
-                                    </p>
-
-                                    <p className="
-                                        text-sm
-                                        text-slate-400
-                                        mt-1
-                                        mb-4
-                                    ">
-                                        ¿Qué deseas hacer?
-                                    </p>
+                                    <div className="
+                                        hidden
+                                        sm:block
+                                        w-px
+                                        h-7
+                                        bg-slate-700
+                                    " />
 
                                     <div className="
                                         flex
+                                        items-center
                                         gap-2
-                                        justify-center
-                                        flex-wrap
                                     ">
 
                                         <button
@@ -1852,23 +1871,24 @@ function SortingVisualizer() {
                                                 continueSorting
                                             }
                                             className="
-                                                px-5
-                                                py-2.5
-                                                rounded-xl
+                                                h-9
+                                                px-3
+                                                rounded-lg
                                                 bg-green-500
                                                 hover:bg-green-400
                                                 text-slate-950
+                                                text-xs
                                                 font-bold
                                                 transition
                                                 flex
                                                 items-center
                                                 justify-center
-                                                gap-2
+                                                gap-1.5
                                             "
                                         >
 
                                             <Play
-                                                size={17}
+                                                size={14}
                                                 fill="currentColor"
                                             />
 
@@ -1881,27 +1901,32 @@ function SortingVisualizer() {
                                                 stopAndRestart
                                             }
                                             className="
-                                                px-5
-                                                py-2.5
-                                                rounded-xl
-                                                bg-red-500
-                                                hover:bg-red-400
-                                                text-white
-                                                font-bold
+                                                h-9
+                                                px-3
+                                                rounded-lg
+                                                bg-slate-800
+                                                hover:bg-red-500
+                                                border
+                                                border-slate-700
+                                                hover:border-red-400
+                                                text-slate-300
+                                                hover:text-white
+                                                text-xs
+                                                font-semibold
                                                 transition
                                                 flex
                                                 items-center
                                                 justify-center
-                                                gap-2
+                                                gap-1.5
                                             "
                                         >
 
                                             <Square
-                                                size={16}
+                                                size={13}
                                                 fill="currentColor"
                                             />
 
-                                            Detener / Reiniciar
+                                            Reiniciar
 
                                         </button>
 
@@ -1918,7 +1943,8 @@ function SortingVisualizer() {
 
                             <div className="
                                 absolute
-                                top-4
+                                top-3
+                                sm:top-4
                                 left-1/2
                                 -translate-x-1/2
                             ">
@@ -1927,19 +1953,22 @@ function SortingVisualizer() {
                                     inline-flex
                                     items-center
                                     gap-2
-                                    px-5
+                                    px-4
+                                    sm:px-5
                                     py-2
                                     rounded-full
                                     bg-green-500/10
                                     border
                                     border-green-500/30
                                     text-green-400
-                                    text-sm
+                                    text-xs
+                                    sm:text-sm
                                     font-semibold
                                     backdrop-blur
+                                    whitespace-nowrap
                                 ">
 
-                                    <Check size={16} />
+                                    <Check size={15} />
 
                                     ¡Ordenamiento completado!
 
@@ -1955,16 +1984,19 @@ function SortingVisualizer() {
                 {/* ESTADISTICAS */}
 
                 <div className="
-                    px-6
-                    pb-6
+                    px-3
+                    sm:px-6
+                    pb-4
+                    sm:pb-6
                 ">
 
                     <div className="
-    grid
-    grid-cols-3
-    gap-2
-    md:gap-4
-">
+                        grid
+                        grid-cols-3
+                        gap-2
+                        sm:gap-3
+                        md:gap-4
+                    ">
 
                         {/* COMPARACIONES */}
 
@@ -1972,29 +2004,41 @@ function SortingVisualizer() {
                             bg-slate-950
                             border
                             border-slate-800
-                            rounded-2xl
-                            p-3 md:p-5
+                            rounded-xl
+                            sm:rounded-2xl
+                            p-2.5
+                            sm:p-4
+                            md:p-5
                         ">
 
                             <div className="
                                 flex
                                 items-center
                                 justify-between
+                                gap-1
                             ">
 
-                                <div>
+                                <div className="
+                                    min-w-0
+                                ">
 
                                     <p className="
-                                        text-sm
+                                        text-[9px]
+                                        sm:text-xs
+                                        md:text-sm
                                         text-slate-500
+                                        truncate
                                     ">
                                         Comparaciones
                                     </p>
 
                                     <p className="
-                                        text-xl md:text-3xl
+                                        text-base
+                                        sm:text-2xl
+                                        md:text-3xl
                                         font-bold
-                                        mt-1
+                                        mt-0.5
+                                        sm:mt-1
                                     ">
                                         {comparisons}
                                     </p>
@@ -2002,9 +2046,15 @@ function SortingVisualizer() {
                                 </div>
 
                                 <div className="
-                                    w-11
-                                    h-11
-                                    rounded-xl
+                                    w-7
+                                    h-7
+                                    sm:w-9
+                                    sm:h-9
+                                    md:w-11
+                                    md:h-11
+                                    shrink-0
+                                    rounded-lg
+                                    sm:rounded-xl
                                     bg-blue-500/10
                                     flex
                                     items-center
@@ -2013,7 +2063,13 @@ function SortingVisualizer() {
                                 ">
 
                                     <Search
-                                        size={21}
+                                        size={14}
+                                        className="
+                                            sm:w-[17px]
+                                            sm:h-[17px]
+                                            md:w-[21px]
+                                            md:h-[21px]
+                                        "
                                         strokeWidth={2}
                                     />
 
@@ -2029,29 +2085,41 @@ function SortingVisualizer() {
                             bg-slate-950
                             border
                             border-slate-800
-                            rounded-2xl
-                            p-3 md:p-5
+                            rounded-xl
+                            sm:rounded-2xl
+                            p-2.5
+                            sm:p-4
+                            md:p-5
                         ">
 
                             <div className="
                                 flex
                                 items-center
                                 justify-between
+                                gap-1
                             ">
 
-                                <div>
+                                <div className="
+                                    min-w-0
+                                ">
 
                                     <p className="
-                                        text-sm
+                                        text-[9px]
+                                        sm:text-xs
+                                        md:text-sm
                                         text-slate-500
+                                        truncate
                                     ">
                                         Movimientos
                                     </p>
 
                                     <p className="
-                                        text-xl md:text-3xl
+                                        text-base
+                                        sm:text-2xl
+                                        md:text-3xl
                                         font-bold
-                                        mt-1
+                                        mt-0.5
+                                        sm:mt-1
                                     ">
                                         {swaps}
                                     </p>
@@ -2059,9 +2127,15 @@ function SortingVisualizer() {
                                 </div>
 
                                 <div className="
-                                    w-11
-                                    h-11
-                                    rounded-xl
+                                    w-7
+                                    h-7
+                                    sm:w-9
+                                    sm:h-9
+                                    md:w-11
+                                    md:h-11
+                                    shrink-0
+                                    rounded-lg
+                                    sm:rounded-xl
                                     bg-purple-500/10
                                     flex
                                     items-center
@@ -2070,7 +2144,13 @@ function SortingVisualizer() {
                                 ">
 
                                     <ArrowLeftRight
-                                        size={21}
+                                        size={14}
+                                        className="
+                                            sm:w-[17px]
+                                            sm:h-[17px]
+                                            md:w-[21px]
+                                            md:h-[21px]
+                                        "
                                         strokeWidth={2}
                                     />
 
@@ -2086,29 +2166,41 @@ function SortingVisualizer() {
                             bg-slate-950
                             border
                             border-slate-800
-                            rounded-2xl
-                            p-3 md:p-5
+                            rounded-xl
+                            sm:rounded-2xl
+                            p-2.5
+                            sm:p-4
+                            md:p-5
                         ">
 
                             <div className="
                                 flex
                                 items-center
                                 justify-between
+                                gap-1
                             ">
 
-                                <div>
+                                <div className="
+                                    min-w-0
+                                ">
 
                                     <p className="
-                                        text-sm
+                                        text-[9px]
+                                        sm:text-xs
+                                        md:text-sm
                                         text-slate-500
+                                        truncate
                                     ">
                                         Elementos
                                     </p>
 
                                     <p className="
-                                        text-xl md:text-3xl
+                                        text-base
+                                        sm:text-2xl
+                                        md:text-3xl
                                         font-bold
-                                        mt-1
+                                        mt-0.5
+                                        sm:mt-1
                                     ">
                                         {data.length}
                                     </p>
@@ -2116,9 +2208,15 @@ function SortingVisualizer() {
                                 </div>
 
                                 <div className="
-                                    w-11
-                                    h-11
-                                    rounded-xl
+                                    w-7
+                                    h-7
+                                    sm:w-9
+                                    sm:h-9
+                                    md:w-11
+                                    md:h-11
+                                    shrink-0
+                                    rounded-lg
+                                    sm:rounded-xl
                                     bg-cyan-500/10
                                     flex
                                     items-center
@@ -2127,7 +2225,13 @@ function SortingVisualizer() {
                                 ">
 
                                     <BarChart3
-                                        size={21}
+                                        size={14}
+                                        className="
+                                            sm:w-[17px]
+                                            sm:h-[17px]
+                                            md:w-[21px]
+                                            md:h-[21px]
+                                        "
                                         strokeWidth={2}
                                     />
 
@@ -2147,8 +2251,10 @@ function SortingVisualizer() {
                     border-t
                     border-slate-800
                     bg-slate-950/50
-                    px-6
-                    py-6
+                    px-4
+                    sm:px-6
+                    py-5
+                    sm:py-6
                 ">
 
                     <div className="
@@ -2156,7 +2262,8 @@ function SortingVisualizer() {
                         grid-cols-1
                         md:grid-cols-2
                         lg:grid-cols-5
-                        gap-4
+                        gap-3
+                        sm:gap-4
                     ">
 
                         {/* GENERAR */}
@@ -2169,7 +2276,8 @@ function SortingVisualizer() {
                                 isSorting
                             }
                             className="
-                                h-12
+                                h-11
+                                sm:h-12
                                 rounded-xl
                                 border
                                 border-slate-700
@@ -2184,11 +2292,13 @@ function SortingVisualizer() {
                                 items-center
                                 justify-center
                                 gap-2
+                                text-sm
+                                sm:text-base
                             "
                         >
 
                             <RotateCcw
-                                size={18}
+                                size={17}
                             />
 
                             Generar datos
@@ -2200,15 +2310,13 @@ function SortingVisualizer() {
                         {!isSorting ? (
 
                             <button
-                                onClick={
-                                    sort
-                                }
+                                onClick={sort}
                                 disabled={
-                                    data.length ===
-                                    0
+                                    data.length === 0
                                 }
                                 className="
-                                    h-12
+                                    h-11
+                                    sm:h-12
                                     rounded-xl
                                     bg-sky-500
                                     hover:bg-sky-400
@@ -2223,6 +2331,8 @@ function SortingVisualizer() {
                                     items-center
                                     justify-center
                                     gap-2
+                                    text-sm
+                                    sm:text-base
                                 "
                             >
 
@@ -2248,7 +2358,8 @@ function SortingVisualizer() {
                                     isPaused
                                 }
                                 className="
-                                    h-12
+                                    h-11
+                                    sm:h-12
                                     rounded-xl
                                     bg-orange-500
                                     hover:bg-orange-400
@@ -2262,6 +2373,8 @@ function SortingVisualizer() {
                                     items-center
                                     justify-center
                                     gap-2
+                                    text-sm
+                                    sm:text-base
                                 "
                             >
 
@@ -2282,25 +2395,15 @@ function SortingVisualizer() {
                         ">
 
                             <select
-                                value={
-                                    algorithm
+                                value={algorithm}
+                                disabled={isSorting}
+                                onChange={
+                                    handleAlgorithmChange
                                 }
-                                disabled={
-                                    isSorting
-                                }
-                                onChange={(e) => {
-
-                                    setAlgorithm(
-                                        e.target.value
-                                    );
-
-                                    setIsSorted(
-                                        false
-                                    );
-                                }}
                                 className="
                                     w-full
-                                    h-12
+                                    h-11
+                                    sm:h-12
                                     appearance-none
                                     rounded-xl
                                     border
@@ -2313,6 +2416,8 @@ function SortingVisualizer() {
                                     focus:border-sky-500
                                     transition
                                     cursor-pointer
+                                    text-sm
+                                    sm:text-base
                                 "
                             >
 
@@ -2343,7 +2448,8 @@ function SortingVisualizer() {
                                 className="
                                     absolute
                                     right-4
-                                    top-3.5
+                                    top-3
+                                    sm:top-3.5
                                     pointer-events-none
                                     text-slate-400
                                 "
@@ -2354,19 +2460,22 @@ function SortingVisualizer() {
                         {/* CANTIDAD */}
 
                         <div className="
-                            h-12
+                            h-11
+                            sm:h-12
                             rounded-xl
                             border
                             border-slate-700
                             bg-slate-900
-                            px-4
+                            px-3
+                            sm:px-4
                             flex
                             items-center
-                            gap-3
+                            gap-2
+                            sm:gap-3
                         ">
 
                             <BarChart3
-                                size={17}
+                                size={16}
                                 className="text-slate-400"
                             />
 
@@ -2375,12 +2484,8 @@ function SortingVisualizer() {
                                 min="10"
                                 max="100"
                                 step="5"
-                                value={
-                                    barCount
-                                }
-                                disabled={
-                                    isSorting
-                                }
+                                value={barCount}
+                                disabled={isSorting}
                                 onChange={
                                     handleBarCountChange
                                 }
@@ -2404,19 +2509,22 @@ function SortingVisualizer() {
                         {/* VELOCIDAD */}
 
                         <div className="
-                            h-12
+                            h-11
+                            sm:h-12
                             rounded-xl
                             border
                             border-slate-700
                             bg-slate-900
-                            px-4
+                            px-3
+                            sm:px-4
                             flex
                             items-center
-                            gap-3
+                            gap-2
+                            sm:gap-3
                         ">
 
                             <Turtle
-                                size={18}
+                                size={17}
                                 className="text-slate-400"
                             />
 
@@ -2424,12 +2532,8 @@ function SortingVisualizer() {
                                 type="range"
                                 min="10"
                                 max="500"
-                                value={
-                                    speed
-                                }
-                                disabled={
-                                    isSorting
-                                }
+                                value={speed}
+                                disabled={isSorting}
                                 onChange={(e) =>
                                     setSpeed(
                                         Number(
@@ -2463,15 +2567,18 @@ function SortingVisualizer() {
             {/* INFORMACION */}
 
             <div className="
-                mt-6
+                mt-5
+                sm:mt-6
                 grid
                 grid-cols-1
                 md:grid-cols-3
-                gap-4
+                gap-3
+                sm:gap-4
             ">
 
                 <div className="
-                    p-3 md:p-5
+                    p-4
+                    sm:p-5
                     rounded-2xl
                     bg-slate-900
                     border
@@ -2507,7 +2614,8 @@ function SortingVisualizer() {
                 </div>
 
                 <div className="
-                    p-3 md:p-5
+                    p-4
+                    sm:p-5
                     rounded-2xl
                     bg-slate-900
                     border
@@ -2543,7 +2651,8 @@ function SortingVisualizer() {
                 </div>
 
                 <div className="
-                    p-3 md:p-5
+                    p-4
+                    sm:p-5
                     rounded-2xl
                     bg-slate-900
                     border
